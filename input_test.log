@@ -1,0 +1,58 @@
+ruledef ip_stuff
+        ip server-ip-address = address-group 2607:7700:*:*:*:*:90e6:ac2c/128
+        tcp either-port range port-map 80/443
+        ip server-ip-address = 123:38572-:39
+#exit
+ruledef urlStuff
+        www http starts-with google.com
+        www url starts-with http://
+        www url starts-with http://10.175.85.141
+        www url starts-with http://10.188.239.160/mms/wapenc
+        www url starts-with http://pol.wholesale.mmsmvno.com
+        p2p app-identifier tls-sni contains s67.podbean.com
+        tcp either-port range port-map 80/443
+#exit
+ruledef MSDP_BoostServer_v6_01
+        ip server-ip-address = address-group 2607:7700:*:*:*:*:90e6:ac2c/128
+        tcp either-port range port-map 80/443
+#exit
+charging-action ca_230_10_CE-MSISDN-IMSI-IP
+      content-id 10
+      service-identifier 230
+      xheader-insert xheader-format CE-MSISDN-IP
+      billing-action cdb
+#exit
+xheader-format CE-MSISDN-IP
+      insert X-Nokia-MSISDN variable bearer radius-calling-station-id
+      insert X-Nokia-chargingid variable bearer 3gpp charging-id
+      insert MSISDN variable bearer msisdn-no-cc
+      insert SGSNIP variable bearer 3gpp sgsn-address
+      insert GGSNIP variable bearer ggsn-address
+      insert CHARGINGID variable bearer 3gpp charging-id
+#exit
+rulebase spp-mobile
+      tcp packets-out-of-order timeout 1000
+      tcp packets-out-of-order transmit after-reordering
+      tcp mss 1400 limit-if-present add-if-not-present
+      flow end-condition timeout normal-end-signaling session-end charging-edr flow-edr
+      action priority 10000 kms ruledef dns-android_44_01 charging-action ca_43_51
+      action priority 10010 group-of-ruledefs dns-43-53ip charging-action ca_41_51
+#exit
+
+host-pool Boost_iesnare_v4
+      ip 198.230.172.44/32
+      ip 198.230.164.98/32
+      ip 169.151.32.32/27
+      ip 169.252.88.128/27
+#exit
+
+ruledef http-ports
+      tcp either-port = 2606
+      udp either-port = 5229
+      tcp either-port = 5229
+      udp either-port = 3195
+      tcp either-port range 9000 to 10000
+      tcp either-port = 993
+      rule-application routing
+      multi-line-or all-lines
+#exit

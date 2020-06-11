@@ -22,12 +22,48 @@ def format_url(line):
         return '\t\texpression 1 tls-cert-subj-common-name eq "*.' + url + '$\"\n'
     return '\t\texpression 1 '  + ' http-host eq ' + url + '\n'
 
+def tcp_udp_format(tcp_ports, udp_ports, ruledef_name):
+    ret = ''
+    if len(tcp_ports) != 0:
+        ret += 'port-list ' + ruledef_name + '-tcp\n'
+        for tcp in tcp_ports:
+            if ' = ' in tcp:
+                port = tcp.split(' = ')[-1]
+                ret += '\tport ' + port + '\n'
+            elif ' range ' in tcp:
+                range = tcp.split(' to ')
+                high = range[-1]
+                low = range[0].split(' ')[-1]
+                ret += '\tport range ' + low + ' ' + high + '\n'
+        ret += 'exit\n\n'
+    if len(udp_ports) != 0:
+        ret += 'port-list ' + ruledef_name + '-udp\n'
+        for udp in udp_ports:
+            if ' = ' in udp:
+                port = udp.split(' = ')[-1]
+                ret += '\tport ' + port + '\n'
+            elif ' range ' in udp:
+                range = udp.split(' to ')
+                high = range[-1]
+                low = range[0].split(' ')[-1]
+                ret += '\tport range ' + low + ' ' + high + '\n'
+        ret += 'exit\n\n'
+    count = 1
+    ret += 'policy-rule-unity \"' + ruledef_name + '\"\n'
+    if len(tcp_ports) != 0:
+        ret += '\tflow-description ' + str(count) + '\n' + '\t\tmatch\n\t\tprotocol 6\n\t\t\tremote-port-list '+ ruledef_name +'-tcp\n\t\texit\n\texit\n'
+        count+=1
+    if len(udp_ports) != 0:
+        ret += '\tflow-description ' + str(count) + '\n' + '\t\tmatch\n\t\tprotocol 17\n\t\t\tremote-port-list '+ ruledef_name +'-udp\n\t\texit\n\texit\n'
+        count+=1
+    # ret += 'exit\n'
+    return ret
 # input_file = open('INPUT FILE NAME OR PATH', 'r') # the first argument is the file name and the second argument says you want to read the file only
 # output_file = open('OUTPUT FILE NAME OR PATH', 'w') # The 'w' is for overwriting a file. So if it contains stuff it will be overwritten
                                                             # If you don't want to overwrite you can use 'a' to append to the existing file instead
                                                             # Also if you are creating a new file and you do not want it to currently exist then use 'x'
 
-input_file = open('SEPCF010_ecs.log', 'r')
+input_file = open('input_test.log', 'r')
 output_file = open('outputfile.log', 'w')
 output_file2 = open('outputfile2.log','w')
 input_file_array = input_file.read().split('\n')
@@ -41,13 +77,33 @@ rulebase_name = '' # get the rulebase_name
 start_action_priority_search = False
 start_charge_action_search = False
 start_x_header_search = False
+start_host_pool = False
 ip_address = ''
 idx_input_file = 0
 ip = False
+tcp_ports = []
+udp_ports = []
 while idx_input_file < len(input_file_array):
     line = input_file_array[idx_input_file].strip() # Removes all trailing spaces
 
-    if start_charge_action_search:
+    if start_host_pool:
+        if line.startswith('ip') and '/' in line:
+            ip_and_mask = line.split(' ')[-1].split('/')
+            ip = ip_and_mask[0]
+            mask = ip_and_mask[1]
+            output_file.write('\taddress ' + ip + ' #mask ' + mask  + '\n')
+            output_file.flush()
+        if line.startswith('#exit'):
+            output_file.write('exit\n')
+            output_file.flush()
+            start_host_pool = False
+    elif line.startswith('host-pool'):
+        host_pool_name = line.split(' ')[-1]
+        output_file.write('ip-address-list ' + host_pool_name + '\n')
+        output_file.flush()
+        start_host_pool = True
+
+    elif start_charge_action_search:
         if line.startswith('content-id'):
             rating_group = line.split(' ')[-1]
             output_file.write('\trating-group ' + rating_group + ' sru ' + str(sru_id) +'\n')
@@ -56,7 +112,7 @@ while idx_input_file < len(input_file_array):
         if line.startswith('#exit'):
             output_file.write('exit\n\n')
             start_charge_action_search = False
-    if line.startswith('charging-action'):
+    elif line.startswith('charging-action'):
         chargingaction_name = line.split(' ')[-1]
         output_file.write('stat-rule-unit \"' + str(sru_id) + '\"\n')
         output_file.write('\turr-id ' + str(sru_id) + ' urr-profile fpt' + '\n')
@@ -66,7 +122,7 @@ while idx_input_file < len(input_file_array):
         sru_id+=1
 
 
-    if start_x_header_search:
+    elif start_x_header_search:
         if line.startswith('insert') and 'bearer ' in line:
             insert_line = line.split(' ')
             name = insert_line[1]
@@ -76,13 +132,13 @@ while idx_input_file < len(input_file_array):
         elif line.startswith('#exit'):
             output_file2.write('\tno shutdown\nexit\n\n')
             start_x_header_search = False
-    if line.startswith('xheader-format'):
+    elif line.startswith('xheader-format'):
         start_x_header_search = True
         xheader = line.split(' ')[-1]
         output_file2.write('http-enrich \"' + xheader + '\" create\n')
         output_file2.flush()
 
-    if start_action_priority_search:
+    elif start_action_priority_search:
         if line.startswith('action priority'):
 
             # grab the necessary info from the line
@@ -115,11 +171,11 @@ while idx_input_file < len(input_file_array):
             rulebase_name = ''
             start_action_priority_search = False
 
-    if line.startswith('rulebase'):
+    elif line.startswith('rulebase'):
         rulebase_name = '\"' + line.partition('rulebase ')[2] + '\"'
         start_action_priority_search = True
 
-    if start_search: # You've seen a ruledef so now search for ip addresses and urls
+    elif start_search: # You've seen a ruledef so now search for ip addresses and urls
         # search for ip_addresses
         if line.startswith('ip server-ip-address') and input_file_array[idx_input_file+1].strip().startswith('tcp') == False:
 
@@ -129,6 +185,11 @@ while idx_input_file < len(input_file_array):
             output_file.flush()
 
             ip_address_count+=1 #increment the ip_address_count
+        elif line.startswith('tcp either-port'):
+            tcp_ports.append(line)
+        elif line.startswith('udp either-port'):
+            udp_ports.append(line)
+
         elif line.startswith('ip server-ip-address') and input_file_array[idx_input_file+1].strip().startswith('tcp'):
             ip_address = line.split(' ')[-1] # extract the ip-address fromt the input line
             tcp_array = input_file_array[idx_input_file+1].split(' ')
@@ -162,6 +223,8 @@ while idx_input_file < len(input_file_array):
             entry+=1
 
         elif '#exit' in line: # stop searching for urls and ip-addresses
+            if len(udp_ports) != 0 and len(tcp_ports) != 0:
+                output_file.write(tcp_udp_format(tcp_ports, udp_ports, ruledef_name))
             if ip:
                 output_file.write('exit\n\n')
             else:
@@ -169,8 +232,10 @@ while idx_input_file < len(input_file_array):
             start_search = False
             ip = False
             ip_address_count = 1 # reset the ip_address_count
+            tcp_ports = []
+            udp_ports = []
 
-    if line.startswith('ruledef'):
+    elif line.startswith('ruledef'):
         # split ruledef line to get the rest of the line
         ruledef_name = line.partition('ruledef ')[2]
         if input_file_array[idx_input_file+1].strip().startswith('ip server-ip-address'):
