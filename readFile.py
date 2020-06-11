@@ -28,8 +28,9 @@ def format_url(line):
                                                             # Also if you are creating a new file and you do not want it to currently exist then use 'x'
 
 input_file = open('SEPCF010_ecs.log', 'r')
-output_file = open('outputfile.log', 'w')
-output_file2 = open('outputfile2.log','w')
+output_file = open('smf.cfg', 'w')
+output_file2 = open('upf-aa.cfg','w')
+output_file3 = open('upf.cfg','w')
 input_file_array = input_file.read().split('\n')
 start_search = False
 ip_address_count = 1 # used to count the ip_addresses
@@ -61,7 +62,13 @@ while idx_input_file < len(input_file_array):
         output_file.write('stat-rule-unit \"' + str(sru_id) + '\"\n')
         output_file.write('\turr-id ' + str(sru_id) + ' urr-profile fpt' + '\n')
         output_file.write('exit\n\n')
+        output_file3.write('stat-rule-unit \"' + str(sru_id) + '\"\n')
+        output_file3.write('\turr-id ' + str(sru_id) + ' urr-profile fpt' + '\n')
+        output_file3.write('exit\n\n')
         output_file.write('charging_rule_unit \"' + chargingaction_name + '\"\n')
+        output_file3.write('sru-list \"' + chargingaction_name + '\"\n')
+        output_file3.write('\tstat-rule-unit \"' + str(sru_id) + '\"\n')
+        output_file3.write('exit\n\n')
         start_charge_action_search = True
         sru_id+=1
 
@@ -104,14 +111,22 @@ while idx_input_file < len(input_file_array):
                                 'policy-rule-unit ' + action_ruledef +
                                 'charging-rule-unit ' + charging_action +
                                 'qci * arp * precedence ' + precedence + '\n')
+            output_file3.write('policy-rule ' + action_ruledef +
+                                'policy-rule-unit ' + action_ruledef +
+                                'stat-rule-unit-list ' + charging_action +
+                                'qci * arp * precedence ' + precedence + '\n')
 
         elif line.startswith('#exit'):
             # write the policy rule base to the output file
             output_file.write('\npolicy-rule-base ' + rulebase_name + '\n')
+            output_file3.write('\npolicy-rule-base ' + rulebase_name + '\n')
             for rd in ruledefs_list:
                 output_file.write('\tpolicy-rule ' + rd + '\n')
+                output_file3.write('\tpolicy-rule ' + rd + '\n')
             output_file.write('exit\n\n')
+            output_file3.write('exit\n\n')
             output_file.flush()
+            output_file3.flush()
             rulebase_name = ''
             start_action_priority_search = False
 
@@ -126,7 +141,9 @@ while idx_input_file < len(input_file_array):
             ip_address = line.split(' ')[-1] # extract the ip-address fromt the input line
 
             output_file.write(format_flow_description(ip_address, ip_address_count))
+            output_file3.write(format_flow_description(ip_address, ip_address_count))
             output_file.flush()
+            output_file3.flush()
 
             ip_address_count+=1 #increment the ip_address_count
         elif line.startswith('ip server-ip-address') and input_file_array[idx_input_file+1].strip().startswith('tcp'):
@@ -140,6 +157,7 @@ while idx_input_file < len(input_file_array):
                 ports_array.append(ports)
             for port in ports_array:
                 output_file.write('\tflow-description ' + str(ip_address_count) + '\n' + '\t\tmatch\n\t\t\tprotocol 6\n' + '\t\t\tremote-ip ' + ip_address + '\n' + '\t\t\tport ' + port + '\n\t\texit\n' + '\texit\n')
+                output_file3.write('\tflow-description ' + str(ip_address_count) + '\n' + '\t\tmatch\n\t\t\tprotocol 6\n' + '\t\t\tremote-ip ' + ip_address + '\n' + '\t\t\tport ' + port + '\n\t\texit\n' + '\texit\n')
                 ip_address_count+=1
         # search for urls
         elif line.startswith('www') or line.startswith('p2p') or line.startswith('http'):
@@ -164,8 +182,10 @@ while idx_input_file < len(input_file_array):
         elif '#exit' in line: # stop searching for urls and ip-addresses
             if ip:
                 output_file.write('exit\n\n')
+                output_file3.write('exit\n\n')
             else:
                 output_file.write('exit\n\n')
+                output_file3.write('exit\n\n')
             start_search = False
             ip = False
             ip_address_count = 1 # reset the ip_address_count
@@ -176,7 +196,10 @@ while idx_input_file < len(input_file_array):
         if input_file_array[idx_input_file+1].strip().startswith('ip server-ip-address'):
             output_file.write('policy-rule-unit \"' + ruledef_name + '\"\n')
             output_file.write('\tpdr-id ' + str(pdr_id) + '\n')
+            output_file3.write('policy-rule-unit \"' + ruledef_name + '\"\n')
+            output_file3.write('\tpdr-id ' + str(pdr_id) + '\n')
             output_file.flush()
+            output_file3.flush()
             ip = True
         else:
             output_file.write('policy-rule-unit \"' + ruledef_name + '\"\n')
@@ -192,8 +215,16 @@ while idx_input_file < len(input_file_array):
             output_file2.write('\tdescription ' + ruledef_name + '\n')
             output_file2.write('\tcharging-group ' + ruledef_name + '\n')
             output_file2.write('exit'  + '\n')
+            output_file3.write('policy-rule-unit \"' + ruledef_name + '\"\n')
+            output_file3.write('\tpdr-id ' + str(pdr_id) + '\n')
+            output_file3.write('\t\tflow-description ' + str(ip_address_count) + '\n')
+            output_file3.write('\t\t\tmatch'  + '\n')
+            output_file3.write('\t\t\t\taa-charging-group '  + '\n')
+            output_file3.write('\t\t\texit'  + '\n')
+            output_file3.write('\t\texit'  + '\n')
             output_file.flush()
             output_file2.flush()
+            output_file3.flush()
             ip = False
             ip_address_count = 1
         # start searching for ip_addresses
