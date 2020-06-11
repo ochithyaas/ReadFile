@@ -93,15 +93,21 @@ while idx_input_file < len(input_file_array):
             ip = ip_and_mask[0]
             mask = ip_and_mask[1]
             output_file.write('\taddress ' + ip + ' #mask ' + mask  + '\n')
+            output_file3.write('\taddress ' + ip + ' #mask ' + mask  + '\n')
             output_file.flush()
+            output_file3.flush()
         if line.startswith('#exit'):
             output_file.write('exit\n')
+            output_file3.write('exit\n')
             output_file.flush()
+            output_file3.flush()
             start_host_pool = False
     elif line.startswith('host-pool'):
         host_pool_name = line.split(' ')[-1]
         output_file.write('ip-address-list ' + host_pool_name + '\n')
+        output_file3.write('ip-address-list ' + host_pool_name + '\n')
         output_file.flush()
+        output_file3.flush()
         start_host_pool = True
 
     elif start_charge_action_search:
@@ -232,7 +238,7 @@ while idx_input_file < len(input_file_array):
             output_file2.write(url)
             # output_file.write('\t\texpression 1 '  + ' http-host eq ' + url + '\n')
 #            output_file.write('\t\t\t' + url + '\n') # write it into the file so there's a tab at the front and then start a newline
-            output_file2.write('\t\tapplication ' + ruledef_name + '\n')
+            output_file2.write('\t\tapplication ' + ruledef_name +  '\n')
             output_file2.write('\t\tno shutdown ' + '\n')
             output_file2.write('\t\texit\n')
 #            output_file.write('\texit\n')
@@ -243,6 +249,7 @@ while idx_input_file < len(input_file_array):
         elif '#exit' in line: # stop searching for urls and ip-addresses
             if len(udp_ports) != 0 and len(tcp_ports) != 0:
                 output_file.write(tcp_udp_format(tcp_ports, udp_ports, ruledef_name))
+                output_file3.write(tcp_udp_format(tcp_ports, udp_ports, ruledef_name))
             if ip:
                 output_file.write('exit\n\n')
                 output_file3.write('exit\n\n')
@@ -267,26 +274,26 @@ while idx_input_file < len(input_file_array):
             output_file3.flush()
             ip = True
         else:
-            output_file.write('policy-rule-unit \"' + ruledef_name + '\"\n')
-            output_file.write('\tpdr-id ' + str(pdr_id) + '\n')
-            output_file.write('\t\tflow-description ' + str(ip_address_count) + '\n')
-            output_file.write('\t\t\tmatch'  + '\n')
-            output_file.write('\t\t\t\taa-charging-group '  + '\n')
+            output_file.write('\tpolicy-rule-unit \"' + ruledef_name + '\"\n')
+            output_file.write('\t\tpdr-id ' + str(pdr_id) + '\n')
+            output_file.write('\t\t\tflow-description ' + str(ip_address_count) + '\n')
+            output_file.write('\t\t\t\tmatch'  + '\n')
+            output_file.write('\t\t\t\t\taa-charging-group '  + ruledef_name + '\n')
+            output_file.write('\t\t\t\texit'  + '\n')
             output_file.write('\t\t\texit'  + '\n')
-            output_file.write('\t\texit'  + '\n')
-            output_file2.write('charging-group \"' + ruledef_name + 'create' + '\"\n')
-            output_file2.write('exit'  + '\n')
-            output_file2.write('application \"' + ruledef_name + 'create' + '\"\n')
-            output_file2.write('\tdescription ' + ruledef_name + '\n')
-            output_file2.write('\tcharging-group ' + ruledef_name + '\n')
-            output_file2.write('exit'  + '\n')
-            output_file3.write('policy-rule-unit \"' + ruledef_name + '\"\n')
-            output_file3.write('\tpdr-id ' + str(pdr_id) + '\n')
-            output_file3.write('\t\tflow-description ' + str(ip_address_count) + '\n')
-            output_file3.write('\t\t\tmatch'  + '\n')
-            output_file3.write('\t\t\t\taa-charging-group '  + '\n')
+            output_file2.write('\tcharging-group \"' + ruledef_name + '\"'+ ' create' +'\n')
+            output_file2.write('\texit'  + '\n')
+            output_file2.write('\tapplication \"' + ruledef_name + '\"' +' create' + '\n')
+            output_file2.write('\t\tdescription ' + ruledef_name + '\n')
+            output_file2.write('\t\tcharging-group ' + ruledef_name + '\n')
+            output_file2.write('\texit'  + '\n')
+            output_file3.write('\tpolicy-rule-unit \"' + ruledef_name + '\"\n')
+            output_file3.write('\t\tpdr-id ' + str(pdr_id) + '\n')
+            output_file3.write('\t\t\tflow-description ' + str(ip_address_count) + '\n')
+            output_file3.write('\t\t\t\tmatch'  + '\n')
+            output_file3.write('\t\t\t\t\taa-charging-group '  + ruledef_name + '\n')
+            output_file3.write('\t\t\t\texit'  + '\n')
             output_file3.write('\t\t\texit'  + '\n')
-            output_file3.write('\t\texit'  + '\n')
             output_file.flush()
             output_file2.flush()
             output_file3.flush()
@@ -302,3 +309,4 @@ while idx_input_file < len(input_file_array):
 input_file.close()
 output_file.close()
 output_file2.close()
+output_file3.close()
